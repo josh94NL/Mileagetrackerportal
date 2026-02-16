@@ -7,8 +7,8 @@ import * as kv from "./kv_store.tsx";
 const app = new Hono();
 
 // Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('MAKE_SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('MAKE_SERVICE_ROLE_KEY') || '';
 
 // Enable logger
 app.use('*', logger(console.log));
