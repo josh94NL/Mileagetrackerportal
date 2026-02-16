@@ -27,22 +27,29 @@ app.use(
 
 // Helper to verify user authentication
 async function verifyUser(authHeader: string | null) {
+  console.log('verifyUser called with authHeader:', authHeader ? 'Bearer [REDACTED]' : 'NULL');
+  
   if (!authHeader) {
+    console.log('verifyUser: No authorization header');
     return { error: 'No authorization header', userId: null };
   }
   
   const accessToken = authHeader.split(' ')[1];
   if (!accessToken) {
+    console.log('verifyUser: No token provided in header');
     return { error: 'No token provided', userId: null };
   }
 
+  console.log('verifyUser: Attempting to verify token with Supabase...');
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const { data, error } = await supabase.auth.getUser(accessToken);
   
   if (error || !data?.user?.id) {
+    console.log('verifyUser: Invalid token', error?.message || 'No user ID');
     return { error: 'Invalid token', userId: null };
   }
   
+  console.log('verifyUser: Success! User ID:', data.user.id);
   return { error: null, userId: data.user.id };
 }
 
