@@ -26,8 +26,9 @@ export default function Login() {
       if (error) {
         toast.error(error.message);
         console.error('Login error:', error);
-      } else {
+      } else if (data.session) {
         toast.success('Logged in successfully');
+        // Auth context will handle profile creation/loading
         navigate('/app');
       }
     } catch (error) {

@@ -41,8 +41,9 @@ export default function Signup() {
       if (error) {
         toast.error(error.message);
         console.error('Sign in after signup error:', error);
-      } else {
+      } else if (data.session) {
         toast.success('Account created successfully!');
+        // Auth context will handle profile creation/loading
         navigate('/app');
       }
     } catch (error) {

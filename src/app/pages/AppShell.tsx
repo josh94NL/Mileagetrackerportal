@@ -1,32 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router';
 import { Car, Plus, FileText, BarChart3, Settings, Menu, X } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
+import { useAuth } from '../lib/AuthContext';
 
 export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        navigate('/login');
-      }
-    } catch (error) {
-      console.error('Auth check error:', error);
+    if (!loading && !user) {
       navigate('/login');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -34,6 +22,10 @@ export default function AppShell() {
         <div className="text-teal-600">Loading...</div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   const navItems = [

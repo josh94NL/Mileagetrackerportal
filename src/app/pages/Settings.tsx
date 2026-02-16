@@ -6,48 +6,25 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
-import { apiRequest, supabase } from '../lib/supabase';
+import { apiRequest } from '../lib/supabase';
+import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
-
-interface Profile {
-  id: string;
-  name: string;
-  email: string;
-}
 
 export default function Settings() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, session, signOut, refreshProfile } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
-    loadProfile();
-    loadCompanyInfo();
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await apiRequest('/profile', {
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-
-      if (response.profile) {
-        setProfile(response.profile);
-        setName(response.profile.name || '');
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-    } finally {
-      setLoading(false);
+    if (profile) {
+      setName(profile.name || '');
     }
-  };
+    loadCompanyInfo();
+  }, [profile]);
 
   const loadCompanyInfo = () => {
     const saved = localStorage.getItem('companyName');
@@ -55,17 +32,17 @@ export default function Settings() {
   };
 
   const saveProfile = async () => {
+    if (!session) return;
+    
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       await apiRequest('/profile', {
         method: 'PUT',
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ name }),
       });
 
+      await refreshProfile();
       toast.success('Profile updated');
     } catch (error) {
       console.error('Save error:', error);
@@ -81,10 +58,9 @@ export default function Settings() {
   };
 
   const exportAllData = async () => {
+    if (!session) return;
+    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const [tripsResponse, vehiclesResponse] = await Promise.all([
         apiRequest('/trips', {
           headers: { Authorization: `Bearer ${session.access_token}` }
@@ -118,7 +94,7 @@ export default function Settings() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut();
       toast.success('Logged out');
       navigate('/');
     } catch (error) {
