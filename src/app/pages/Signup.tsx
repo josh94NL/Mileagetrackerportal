@@ -46,7 +46,8 @@ export default function Signup() {
         navigate('/app');
       }
     } catch (error) {
-      toast.error('Signup failed');
+      const errorMessage = error instanceof Error ? error.message : 'Signup failed';
+      toast.error(errorMessage);
       console.error('Signup exception:', error);
     } finally {
       setLoading(false);

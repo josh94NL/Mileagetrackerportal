@@ -17,15 +17,30 @@ export async function apiRequest(
     ...options.headers,
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || 'Request failed');
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.error(`API request failed: ${url}`, {
+        status: response.status,
+        statusText: response.statusText,
+        data
+      });
+      return { error: data.error || `Request failed: ${response.status} ${response.statusText}` };
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`API request exception: ${url}`, error);
+    return { 
+      error: error instanceof Error 
+        ? `Network error: ${error.message}` 
+        : 'Network error: Unable to connect to server. Please ensure the Supabase Edge Function is deployed.' 
+    };
   }
-
-  return response.json();
 }
