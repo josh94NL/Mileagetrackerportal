@@ -14,6 +14,7 @@ export async function apiRequest(
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${publicAnonKey}`,
     ...options.headers,
   };
 
@@ -31,7 +32,7 @@ export async function apiRequest(
         statusText: response.statusText,
         data
       });
-      return { error: data.error || `Request failed: ${response.status} ${response.statusText}` };
+      return { error: data.error || `Request failed: ${response.status}` };
     }
 
     return data;
