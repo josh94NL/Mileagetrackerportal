@@ -14,6 +14,7 @@ export async function apiRequest(
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${publicAnonKey}`,
     ...options.headers,
   };
 
