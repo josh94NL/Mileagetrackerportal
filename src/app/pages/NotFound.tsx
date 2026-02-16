@@ -1,23 +1,32 @@
 import { Link } from 'react-router';
 import { Home } from 'lucide-react';
-import { Button } from '../components/ui/button';
+import { motion } from 'motion/react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="text-center space-y-6">
-        <h1 className="text-6xl font-bold text-gray-300">404</h1>
-        <h2 className="text-2xl font-semibold text-gray-700">Page not found</h2>
-        <p className="text-gray-500">
-          The page you're looking for doesn't exist.
+    <div className="min-h-screen bg-[#07070e] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="absolute top-[-20%] left-[50%] -translate-x-1/2 w-[500px] h-[500px] bg-[#8B5CF6]/8 rounded-full blur-[120px] pointer-events-none" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-center space-y-5 relative z-10"
+      >
+        <div className="text-8xl font-bold bg-gradient-to-b from-white/20 to-white/[0.03] bg-clip-text text-transparent">
+          404
+        </div>
+        <h2 className="text-xl font-semibold text-white">Page not found</h2>
+        <p className="text-[#8888a4] text-sm max-w-xs mx-auto">
+          The page you're looking for doesn't exist or has been moved.
         </p>
         <Link to="/">
-          <Button className="bg-teal-600 hover:bg-teal-700">
-            <Home className="w-4 h-4 mr-2" />
+          <button className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-semibold text-sm flex items-center gap-2 mx-auto hover:shadow-[0_0_20px_rgba(0,229,160,0.25)] transition-all">
+            <Home className="w-4 h-4" />
             Go Home
-          </Button>
+          </button>
         </Link>
-      </div>
+      </motion.div>
     </div>
   );
 }

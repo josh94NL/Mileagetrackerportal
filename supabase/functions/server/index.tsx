@@ -10,6 +10,10 @@ const app = new Hono();
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('MAKE_SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('MAKE_SERVICE_ROLE_KEY') || '';
 
+console.log('=== SERVER STARTUP ===');
+console.log('Supabase URL configured:', supabaseUrl ? 'YES' : 'NO');
+console.log('Service Key configured:', supabaseServiceKey ? 'YES (length: ' + supabaseServiceKey.length + ')' : 'NO');
+
 // Enable logger
 app.use('*', logger(console.log));
 
@@ -18,7 +22,7 @@ app.use(
   "/*",
   cors({
     origin: "*",
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "apikey", "X-User-Token"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
     maxAge: 600,
@@ -26,26 +30,38 @@ app.use(
 );
 
 // Helper to verify user authentication
-async function verifyUser(authHeader: string | null) {
-  console.log('verifyUser called with authHeader:', authHeader ? 'Bearer [REDACTED]' : 'NULL');
+async function verifyUser(request: any) {
+  // The frontend sends the real user access_token via X-User-Token header
+  // (Authorization header carries the anon key to satisfy the Supabase gateway)
+  const userToken = request.header ? request.header('X-User-Token') : request.headers?.get('X-User-Token');
   
-  if (!authHeader) {
-    console.log('verifyUser: No authorization header');
-    return { error: 'No authorization header', userId: null };
-  }
+  // Fallback: also check Authorization for backwards compat / direct calls
+  const authHeader = request.header ? request.header('Authorization') : request.headers?.get('Authorization');
+  const authToken = authHeader ? authHeader.replace('Bearer ', '') : null;
   
-  const accessToken = authHeader.split(' ')[1];
+  const accessToken = userToken || authToken;
+  
+  console.log('verifyUser: Has X-User-Token:', !!userToken);
+  console.log('verifyUser: Has Authorization:', !!authHeader);
+
   if (!accessToken) {
-    console.log('verifyUser: No token provided in header');
+    console.log('verifyUser: No token provided');
     return { error: 'No token provided', userId: null };
   }
 
   console.log('verifyUser: Attempting to verify token with Supabase...');
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+  
   const { data, error } = await supabase.auth.getUser(accessToken);
   
   if (error || !data?.user?.id) {
-    console.log('verifyUser: Invalid token', error?.message || 'No user ID');
+    console.log('verifyUser: Invalid token. Error:', error?.message || 'No user ID');
     return { error: 'Invalid token', userId: null };
   }
   
@@ -55,7 +71,7 @@ async function verifyUser(authHeader: string | null) {
 
 // Health check endpoint
 app.get("/make-server-7770b39e/health", (c) => {
-  return c.json({ status: "ok" });
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Sign up endpoint
@@ -106,7 +122,7 @@ app.post("/make-server-7770b39e/signup", async (c) => {
 
 // Get user profile
 app.get("/make-server-7770b39e/profile", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -118,7 +134,7 @@ app.get("/make-server-7770b39e/profile", async (c) => {
 
 // Update user profile
 app.put("/make-server-7770b39e/profile", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -142,7 +158,7 @@ app.put("/make-server-7770b39e/profile", async (c) => {
 
 // Get all vehicles for user
 app.get("/make-server-7770b39e/vehicles", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -154,7 +170,7 @@ app.get("/make-server-7770b39e/vehicles", async (c) => {
 
 // Create vehicle
 app.post("/make-server-7770b39e/vehicles", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -178,7 +194,7 @@ app.post("/make-server-7770b39e/vehicles", async (c) => {
 
 // Update vehicle
 app.put("/make-server-7770b39e/vehicles/:id", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -206,7 +222,7 @@ app.put("/make-server-7770b39e/vehicles/:id", async (c) => {
 
 // Delete vehicle
 app.delete("/make-server-7770b39e/vehicles/:id", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -222,7 +238,7 @@ app.delete("/make-server-7770b39e/vehicles/:id", async (c) => {
 
 // Get all trips for user with optional filters
 app.get("/make-server-7770b39e/trips", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -240,7 +256,7 @@ app.get("/make-server-7770b39e/trips", async (c) => {
 
 // Create trip
 app.post("/make-server-7770b39e/trips", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -288,7 +304,7 @@ app.post("/make-server-7770b39e/trips", async (c) => {
 
 // Update trip
 app.put("/make-server-7770b39e/trips/:id", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -326,7 +342,7 @@ app.put("/make-server-7770b39e/trips/:id", async (c) => {
 
 // Delete trip
 app.delete("/make-server-7770b39e/trips/:id", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -342,7 +358,7 @@ app.delete("/make-server-7770b39e/trips/:id", async (c) => {
 
 // Get report statistics
 app.get("/make-server-7770b39e/reports", async (c) => {
-  const { error, userId } = await verifyUser(c.req.header('Authorization'));
+  const { error, userId } = await verifyUser(c.req);
   
   if (error || !userId) {
     return c.json({ error: 'Unauthorized' }, 401);

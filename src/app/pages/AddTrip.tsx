@@ -1,14 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, MapPin, Gauge, Repeat, Copy } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
+import { ArrowLeft, MapPin, Gauge, Repeat, Copy, Briefcase, User as UserIcon, Navigation } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Card } from '../components/ui/card';
 import { apiRequest, supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { motion } from 'motion/react';
 
 interface Vehicle {
   id: string;
@@ -32,10 +28,9 @@ export default function AddTrip() {
   const [loading, setLoading] = useState(false);
   const startLocationRef = useRef<HTMLInputElement>(null);
 
-  // Form state with defaults
   const today = new Date().toISOString().split('T')[0];
   const now = new Date().toTimeString().slice(0, 5);
-  
+
   const [date, setDate] = useState(today);
   const [time, setTime] = useState(now);
   const [vehicleId, setVehicleId] = useState('');
@@ -51,15 +46,12 @@ export default function AddTrip() {
   }, []);
 
   useEffect(() => {
-    // Auto-focus first field
     startLocationRef.current?.focus();
   }, []);
 
   useEffect(() => {
-    // Auto-select vehicle if only one exists
     if (vehicles.length === 1 && !vehicleId) {
       setVehicleId(vehicles[0].id);
-      // Pre-fill odometer start from vehicle
       if (!odometerStart && vehicles[0].current_odometer > 0) {
         setOdometerStart(vehicles[0].current_odometer.toString());
       }
@@ -70,25 +62,16 @@ export default function AddTrip() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-
       const token = session.access_token;
 
       const [vehiclesResponse, tripsResponse] = await Promise.all([
-        apiRequest('/vehicles', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        apiRequest('/trips', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        apiRequest('/vehicles', { headers: { Authorization: `Bearer ${token}` } }),
+        apiRequest('/trips', { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       setVehicles(vehiclesResponse.vehicles || []);
-      
-      // Get last trip
       const trips = tripsResponse.trips || [];
-      if (trips.length > 0) {
-        setLastTrip(trips[0]); // Already sorted by date desc
-      }
+      if (trips.length > 0) setLastTrip(trips[0]);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -99,46 +82,30 @@ export default function AddTrip() {
       toast.error('Location not supported');
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const location = `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
         setEndLocation(location);
         toast.success('Location captured');
       },
-      (error) => {
-        console.error('Location error:', error);
-        toast.error('Location permission denied — enter manually.');
-      }
+      () => toast.error('Location permission denied')
     );
   };
 
   const useSameAsLastTrip = () => {
-    if (!lastTrip) {
-      toast.error('No previous trip found');
-      return;
-    }
-
+    if (!lastTrip) { toast.error('No previous trip'); return; }
     setStartLocation(lastTrip.end_location);
-    if (lastTrip.odometer_end) {
-      setOdometerStart(lastTrip.odometer_end.toString());
-    }
+    if (lastTrip.odometer_end) setOdometerStart(lastTrip.odometer_end.toString());
     toast.success('Filled from last trip');
   };
 
   const duplicateLastTrip = () => {
-    if (!lastTrip) {
-      toast.error('No previous trip found');
-      return;
-    }
-
+    if (!lastTrip) { toast.error('No previous trip'); return; }
     setStartLocation(lastTrip.start_location);
     setEndLocation(lastTrip.end_location);
     setOdometerStart(lastTrip.odometer_start.toString());
     setOdometerEnd(lastTrip.odometer_end.toString());
-    if (lastTrip.vehicle_id) {
-      setVehicleId(lastTrip.vehicle_id);
-    }
+    if (lastTrip.vehicle_id) setVehicleId(lastTrip.vehicle_id);
     toast.success('Trip duplicated');
   };
 
@@ -158,23 +125,12 @@ export default function AddTrip() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
     const start = parseFloat(odometerStart);
     const end = parseFloat(odometerEnd);
-    
-    if (isNaN(start) || isNaN(end)) {
-      toast.error('Enter a valid km value.');
-      return;
-    }
-    
-    if (end <= start) {
-      toast.error('Odometer end must be greater than odometer start.');
-      return;
-    }
+    if (isNaN(start) || isNaN(end)) { toast.error('Enter valid km values'); return; }
+    if (end <= start) { toast.error('End must be greater than start'); return; }
 
     setLoading(true);
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -183,19 +139,12 @@ export default function AddTrip() {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          date,
-          time,
-          vehicle_id: vehicleId || undefined,
-          start_location: startLocation,
-          end_location: endLocation,
-          odometer_start: start,
-          odometer_end: end,
-          purpose,
-          notes,
+          date, time, vehicle_id: vehicleId || undefined,
+          start_location: startLocation, end_location: endLocation,
+          odometer_start: start, odometer_end: end, purpose, notes,
         }),
       });
-
-      toast.success('Trip saved.');
+      toast.success('Trip saved!');
       navigate('/app/trips');
     } catch (error) {
       console.error('Save error:', error);
@@ -208,247 +157,256 @@ export default function AddTrip() {
   const distance = calculateDistance();
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
+    <div className="p-5 md:p-8 max-w-2xl mx-auto">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3 mb-6"
+      >
+        <button
           onClick={() => navigate(-1)}
-          className="h-10 w-10"
+          className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#8888a4] hover:text-white hover:bg-white/[0.06] transition-all"
         >
           <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-2xl md:text-3xl font-bold">Add Trip</h1>
-      </div>
+        </button>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Add Trip</h1>
+      </motion.div>
 
       {/* Quick Actions */}
-      <Card className="p-4 mb-4">
-        <div className="text-sm font-medium text-gray-700 mb-3">Quick actions</div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={useSameAsLastTrip}
-            disabled={!lastTrip}
-            className="text-xs h-9"
-          >
-            <Repeat className="w-3 h-3 mr-1" />
-            Same as last trip
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={duplicateLastTrip}
-            disabled={!lastTrip}
-            className="text-xs h-9"
-          >
-            <Copy className="w-3 h-3 mr-1" />
-            Duplicate last trip
-          </Button>
-        </div>
-      </Card>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-2 gap-2.5 mb-6"
+      >
+        <button
+          type="button"
+          onClick={useSameAsLastTrip}
+          disabled={!lastTrip}
+          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-[#8B5CF6]/10 border border-[#8B5CF6]/20 text-[#A78BFA] text-xs font-semibold hover:bg-[#8B5CF6]/15 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Repeat className="w-3.5 h-3.5" />
+          Continue last trip
+        </button>
+        <button
+          type="button"
+          onClick={duplicateLastTrip}
+          disabled={!lastTrip}
+          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-[#06B6D4]/10 border border-[#06B6D4]/20 text-[#22D3EE] text-xs font-semibold hover:bg-[#06B6D4]/15 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Duplicate last trip
+        </button>
+      </motion.div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Date & Time */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Date</label>
+            <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white focus:outline-none focus:border-[#00E5A0]/30 transition-all [color-scheme:dark]"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="time">Time</Label>
-            <Input
-              id="time"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Time</label>
+            <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white focus:outline-none focus:border-[#00E5A0]/30 transition-all [color-scheme:dark]"
             />
           </div>
-        </div>
+        </motion.div>
 
         {/* Vehicle */}
-        <div className="space-y-2">
-          <Label htmlFor="vehicle">Vehicle</Label>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="space-y-1.5">
+          <label className="text-xs text-[#8888a4] font-medium">Vehicle</label>
           {vehicles.length === 0 ? (
-            <div className="text-sm text-gray-500">
-              No vehicles yet. <button
-                type="button"
-                onClick={() => navigate('/app/vehicles')}
-                className="text-teal-600 underline"
-              >
-                Add one
-              </button>
-            </div>
+            <p className="text-sm text-[#4a4a66]">
+              No vehicles yet.{' '}
+              <button type="button" onClick={() => navigate('/app/vehicles')} className="text-[#00E5A0] underline">Add one</button>
+            </p>
           ) : (
             <Select value={vehicleId} onValueChange={setVehicleId}>
-              <SelectTrigger className="h-12 text-base">
-                <SelectValue placeholder="Select vehicle (optional)" />
+              <SelectTrigger className="h-12 rounded-xl bg-white/[0.04] border-white/[0.08] text-white">
+                <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
-              <SelectContent>
-                {vehicles.map(vehicle => (
-                  <SelectItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.name}
-                  </SelectItem>
+              <SelectContent className="bg-[#151524] border-white/[0.08] text-white">
+                {vehicles.map(v => (
+                  <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
-        </div>
+        </motion.div>
 
         {/* Locations */}
-        <Card className="p-4 space-y-4 border-2 border-teal-100">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-4"
+        >
           <div className="flex items-center justify-between">
-            <Label className="text-base">Locations</Label>
-            <Button
+            <div className="flex items-center gap-2 text-[#00E5A0]">
+              <MapPin className="w-4 h-4" />
+              <span className="text-sm font-semibold text-white">Locations</span>
+            </div>
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
               onClick={reverseLocations}
-              className="text-xs"
+              className="flex items-center gap-1 text-xs text-[#8888a4] hover:text-white transition-colors"
             >
-              <Repeat className="w-3 h-3 mr-1" />
+              <Repeat className="w-3 h-3" />
               Reverse
-            </Button>
+            </button>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="start_location">Start Location</Label>
-            <Input
-              id="start_location"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Start</label>
+            <input
               ref={startLocationRef}
               placeholder="Enter start location"
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="end_location">End Location</Label>
-              <Button
+              <label className="text-xs text-[#8888a4] font-medium">End</label>
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
                 onClick={useCurrentLocation}
-                className="text-xs"
+                className="flex items-center gap-1 text-xs text-[#8B5CF6] hover:text-[#A78BFA] transition-colors"
               >
-                <MapPin className="w-3 h-3 mr-1" />
-                Use current location
-              </Button>
+                <Navigation className="w-3 h-3" />
+                Current location
+              </button>
             </div>
-            <Input
-              id="end_location"
+            <input
               placeholder="Enter end location"
               value={endLocation}
               onChange={(e) => setEndLocation(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
             />
           </div>
-        </Card>
+        </motion.div>
 
         {/* Odometer */}
-        <Card className="p-4 space-y-4 border-2 border-teal-100">
-          <div className="flex items-center gap-2">
-            <Gauge className="w-5 h-5 text-teal-600" />
-            <Label className="text-base">Odometer</Label>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-4"
+        >
+          <div className="flex items-center gap-2 text-[#00E5A0]">
+            <Gauge className="w-4 h-4" />
+            <span className="text-sm font-semibold text-white">Odometer</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="odometer_start">Start (km)</Label>
-              <Input
-                id="odometer_start"
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8888a4] font-medium">Start (km)</label>
+              <input
                 type="number"
                 inputMode="numeric"
                 placeholder="0"
                 value={odometerStart}
                 onChange={(e) => setOdometerStart(e.target.value)}
                 required
-                className="h-14 text-lg font-bold text-center"
+                className="w-full h-14 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-xl font-bold text-center placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="odometer_end">End (km)</Label>
-              <Input
-                id="odometer_end"
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8888a4] font-medium">End (km)</label>
+              <input
                 type="number"
                 inputMode="numeric"
                 placeholder="0"
                 value={odometerEnd}
                 onChange={(e) => setOdometerEnd(e.target.value)}
                 required
-                className="h-14 text-lg font-bold text-center"
+                className="w-full h-14 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-xl font-bold text-center placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
               />
             </div>
           </div>
 
           {/* Distance Display */}
-          <div className="bg-teal-50 p-4 rounded-lg text-center">
-            <div className="text-sm text-gray-600 mb-1">Distance</div>
-            <div className="text-3xl font-bold text-teal-600">
-              {distance.toFixed(1)} km
+          <div className="relative rounded-xl overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00E5A0]/10 to-[#8B5CF6]/10" />
+            <div className="relative p-4 text-center">
+              <div className="text-xs text-[#8888a4] mb-1 uppercase tracking-wider font-medium">Distance</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-[#00E5A0] to-[#06D6A0] bg-clip-text text-transparent">
+                {distance.toFixed(1)} km
+              </div>
             </div>
           </div>
-        </Card>
+        </motion.div>
 
         {/* Purpose */}
-        <div className="space-y-2">
-          <Label>Purpose</Label>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="space-y-2">
+          <label className="text-xs text-[#8888a4] font-medium">Purpose</label>
           <div className="grid grid-cols-2 gap-3">
-            <Button
+            <button
               type="button"
-              variant={purpose === 'business' ? 'default' : 'outline'}
-              className={`h-12 ${purpose === 'business' ? 'bg-teal-600 hover:bg-teal-700' : ''}`}
               onClick={() => setPurpose('business')}
+              className={`h-12 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                purpose === 'business'
+                  ? 'bg-[#8B5CF6]/15 border-2 border-[#8B5CF6]/40 text-[#A78BFA]'
+                  : 'bg-white/[0.03] border border-white/[0.08] text-[#8888a4] hover:text-white hover:bg-white/[0.05]'
+              }`}
             >
+              <Briefcase className="w-4 h-4" />
               Business
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              variant={purpose === 'private' ? 'default' : 'outline'}
-              className={`h-12 ${purpose === 'private' ? 'bg-gray-600 hover:bg-gray-700' : ''}`}
               onClick={() => setPurpose('private')}
+              className={`h-12 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                purpose === 'private'
+                  ? 'bg-white/[0.08] border-2 border-white/[0.20] text-white'
+                  : 'bg-white/[0.03] border border-white/[0.08] text-[#8888a4] hover:text-white hover:bg-white/[0.05]'
+              }`}
             >
+              <UserIcon className="w-4 h-4" />
               Private
-            </Button>
+            </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Notes */}
-        <div className="space-y-2">
-          <Label htmlFor="notes">Notes (optional)</Label>
-          <Textarea
-            id="notes"
-            placeholder="Add any notes about this trip..."
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="space-y-1.5">
+          <label className="text-xs text-[#8888a4] font-medium">Notes (optional)</label>
+          <textarea
+            placeholder="Add any notes..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            className="text-base"
+            className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all resize-none text-sm"
           />
-        </div>
+        </motion.div>
 
         {/* Submit */}
-        <Button
-          type="submit"
-          className="w-full h-14 text-lg font-semibold bg-teal-600 hover:bg-teal-700 sticky bottom-4"
-          disabled={loading}
-        >
-          {loading ? 'Saving...' : 'Save Trip'}
-        </Button>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+          <button
+            type="submit"
+            className="w-full h-14 rounded-2xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-bold text-lg flex items-center justify-center gap-2 hover:shadow-[0_0_30px_rgba(0,229,160,0.3)] transition-all duration-300 active:scale-[0.98] disabled:opacity-50 sticky bottom-4"
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : 'Save Trip'}
+          </button>
+        </motion.div>
       </form>
     </div>
   );

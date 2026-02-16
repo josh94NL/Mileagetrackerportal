@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Car, Edit, Trash2 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Card } from '../components/ui/card';
-import { apiRequest, supabase } from '../lib/supabase';
+import { Plus, Car, Edit, Trash2, Gauge, X } from 'lucide-react';
+import { apiRequest } from '../lib/supabase';
+import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Vehicle {
   id: string;
@@ -16,6 +13,7 @@ interface Vehicle {
 }
 
 export default function Vehicles() {
+  const { session } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,15 +29,19 @@ export default function Vehicles() {
   }, []);
 
   const loadVehicles = async () => {
+    if (!session) {
+      setLoading(false);
+      return;
+    }
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const response = await apiRequest('/vehicles', {
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
-
-      setVehicles(response.vehicles || []);
+      if (response.error) {
+        toast.error(response.error);
+      } else {
+        setVehicles(response.vehicles || []);
+      }
     } catch (error) {
       console.error('Error loading vehicles:', error);
       toast.error('Failed to load vehicles');
@@ -73,12 +75,10 @@ export default function Vehicles() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!session) { toast.error('Not authenticated'); return; }
     setSaving(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const vehicleData = {
         name,
         license_plate: licensePlate,
@@ -86,32 +86,20 @@ export default function Vehicles() {
       };
 
       if (editingVehicle) {
-        // Update
         const response = await apiRequest(`/vehicles/${editingVehicle.id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify(vehicleData),
         });
-        
-        if (response.error) {
-          toast.error(response.error);
-          return;
-        }
-        
+        if (response.error) { toast.error(response.error); setSaving(false); return; }
         toast.success('Vehicle updated');
       } else {
-        // Create
         const response = await apiRequest('/vehicles', {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify(vehicleData),
         });
-        
-        if (response.error) {
-          toast.error(response.error);
-          return;
-        }
-        
+        if (response.error) { toast.error(response.error); setSaving(false); return; }
         toast.success('Vehicle added');
       }
 
@@ -127,16 +115,13 @@ export default function Vehicles() {
 
   const deleteVehicle = async (id: string) => {
     if (!confirm('Delete this vehicle?')) return;
+    if (!session) { toast.error('Not authenticated'); return; }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       await apiRequest(`/vehicles/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
-
       setVehicles(vehicles.filter(v => v.id !== id));
       toast.success('Vehicle deleted');
     } catch (error) {
@@ -147,152 +132,180 @@ export default function Vehicles() {
 
   if (loading) {
     return (
-      <div className="p-4 md:p-6">
-        <div className="text-center py-12 text-gray-500">Loading vehicles...</div>
+      <div className="p-5 md:p-8">
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-8 h-8 border-2 border-[#00E5A0]/30 border-t-[#00E5A0] rounded-full animate-spin" />
+          <span className="text-[#8888a4] text-sm">Loading vehicles...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto">
+    <div className="p-5 md:p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Vehicles</h1>
-        <Button
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Vehicles</h1>
+          <p className="text-sm text-[#8888a4] mt-0.5">{vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''}</p>
+        </div>
+        <button
           onClick={() => openDialog()}
-          className="bg-teal-600 hover:bg-teal-700"
+          className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-semibold text-sm flex items-center gap-2 hover:shadow-[0_0_20px_rgba(0,229,160,0.25)] transition-all"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4" />
           Add Vehicle
-        </Button>
+        </button>
       </div>
 
       {vehicles.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="text-gray-400 mb-4">
-            <Car className="w-12 h-12 mx-auto" />
+        <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-4">
+            <Car className="w-7 h-7 text-[#4a4a66]" />
           </div>
-          <p className="text-gray-600 mb-4">
-            No vehicles yet. Add your first vehicle to start tracking.
-          </p>
-          <Button
+          <p className="text-[#8888a4] mb-1 font-medium">No vehicles yet</p>
+          <p className="text-[#4a4a66] text-sm mb-6">Add your first vehicle to start tracking</p>
+          <button
             onClick={() => openDialog()}
-            className="bg-teal-600 hover:bg-teal-700"
+            className="h-10 px-5 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-semibold text-sm flex items-center gap-2"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4" />
             Add Vehicle
-          </Button>
-        </Card>
+          </button>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {vehicles.map((vehicle) => (
-            <Card key={vehicle.id} className="p-4">
+        <div className="grid gap-3 md:grid-cols-2">
+          {vehicles.map((vehicle, index) => (
+            <motion.div
+              key={vehicle.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+              className="group p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05] hover:border-white/[0.10] transition-all duration-200"
+            >
               <div className="flex justify-between items-start gap-3">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Car className="w-5 h-5 text-teal-600" />
-                    <h3 className="font-bold text-lg">{vehicle.name}</h3>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00E5A0]/15 to-[#8B5CF6]/15 border border-white/[0.06] flex items-center justify-center">
+                      <Car className="w-5 h-5 text-[#00E5A0]" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white">{vehicle.name}</h3>
+                      {vehicle.license_plate && (
+                        <p className="text-xs text-[#8888a4]">{vehicle.license_plate}</p>
+                      )}
+                    </div>
                   </div>
-                  {vehicle.license_plate && (
-                    <p className="text-sm text-gray-600 mb-2">
-                      {vehicle.license_plate}
-                    </p>
-                  )}
-                  <div className="text-sm">
-                    <span className="text-gray-500">Current odometer: </span>
-                    <span className="font-semibold">{vehicle.current_odometer.toLocaleString()} km</span>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03]">
+                    <Gauge className="w-3.5 h-3.5 text-[#8888a4]" />
+                    <span className="text-xs text-[#8888a4]">Odometer:</span>
+                    <span className="text-sm font-semibold text-[#00E5A0]">{vehicle.current_odometer.toLocaleString()} km</span>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
                     onClick={() => openDialog(vehicle)}
-                    className="h-9 w-9"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/[0.06] text-[#8888a4] hover:text-white transition-all"
                   >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => deleteVehicle(vehicle.id)}
-                    className="h-9 w-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#ff4466]/10 text-[#8888a4] hover:text-[#ff4466] transition-all"
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-            </Card>
+            </motion.div>
           ))}
         </div>
       )}
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingVehicle ? 'Edit Vehicle' : 'Add Vehicle'}
-            </DialogTitle>
-          </DialogHeader>
+      {/* Dialog */}
+      <AnimatePresence>
+        {dialogOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4"
+            onClick={closeDialog}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="w-full max-w-md rounded-2xl bg-[#12121a] border border-white/[0.08] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+                <h2 className="text-lg font-bold text-white">
+                  {editingVehicle ? 'Edit Vehicle' : 'Add Vehicle'}
+                </h2>
+                <button
+                  onClick={closeDialog}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/[0.06] text-[#8888a4] transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Vehicle Name</Label>
-              <Input
-                id="name"
-                placeholder="e.g., Honda Civic"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="h-12 text-base"
-              />
-            </div>
+              <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-[#8888a4] font-medium">Vehicle Name</label>
+                  <input
+                    placeholder="e.g., Honda Civic"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-[#8888a4] font-medium">License Plate</label>
+                  <input
+                    placeholder="ABC-123"
+                    value={licensePlate}
+                    onChange={(e) => setLicensePlate(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-[#8888a4] font-medium">Current Odometer (km)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={currentOdometer}
+                    onChange={(e) => setCurrentOdometer(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="license_plate">License Plate</Label>
-              <Input
-                id="license_plate"
-                placeholder="ABC-123"
-                value={licensePlate}
-                onChange={(e) => setLicensePlate(e.target.value)}
-                className="h-12 text-base"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="current_odometer">Current Odometer (km)</Label>
-              <Input
-                id="current_odometer"
-                type="number"
-                inputMode="numeric"
-                placeholder="0"
-                value={currentOdometer}
-                onChange={(e) => setCurrentOdometer(e.target.value)}
-                className="h-12 text-base"
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={closeDialog}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-teal-600 hover:bg-teal-700"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : editingVehicle ? 'Update' : 'Add'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeDialog}
+                    disabled={saving}
+                    className="flex-1 h-12 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white font-medium hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-semibold hover:shadow-[0_0_20px_rgba(0,229,160,0.25)] transition-all disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : editingVehicle ? 'Update' : 'Add'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,21 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { User, Building2, LogOut, Download, Smartphone } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Card } from '../components/ui/card';
-import { Separator } from '../components/ui/separator';
+import { User, Building2, LogOut, Download, Smartphone, Shield, ChevronRight } from 'lucide-react';
 import { apiRequest } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
+import { motion } from 'motion/react';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { profile, session, signOut, refreshProfile } = useAuth();
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
 
@@ -23,17 +18,12 @@ export default function Settings() {
     if (profile) {
       setName(profile.name || '');
     }
-    loadCompanyInfo();
-  }, [profile]);
-
-  const loadCompanyInfo = () => {
     const saved = localStorage.getItem('companyName');
     if (saved) setCompanyName(saved);
-  };
+  }, [profile]);
 
   const saveProfile = async () => {
     if (!session) return;
-    
     setSaving(true);
     try {
       await apiRequest('/profile', {
@@ -41,7 +31,6 @@ export default function Settings() {
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ name }),
       });
-
       await refreshProfile();
       toast.success('Profile updated');
     } catch (error) {
@@ -59,15 +48,10 @@ export default function Settings() {
 
   const exportAllData = async () => {
     if (!session) return;
-    
     try {
       const [tripsResponse, vehiclesResponse] = await Promise.all([
-        apiRequest('/trips', {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }),
-        apiRequest('/vehicles', {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        })
+        apiRequest('/trips', { headers: { Authorization: `Bearer ${session.access_token}` } }),
+        apiRequest('/vehicles', { headers: { Authorization: `Bearer ${session.access_token}` } })
       ]);
 
       const exportData = {
@@ -84,7 +68,6 @@ export default function Settings() {
       a.download = `mileage-data-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-
       toast.success('Data exported');
     } catch (error) {
       console.error('Export error:', error);
@@ -107,7 +90,6 @@ export default function Settings() {
     const confirmed = confirm(
       'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.'
     );
-    
     if (!confirmed) return;
 
     const doubleConfirm = prompt('Type "DELETE" to confirm account deletion:');
@@ -115,167 +97,188 @@ export default function Settings() {
       toast.error('Account deletion cancelled');
       return;
     }
-
-    // Note: Account deletion would require backend endpoint
     toast.error('Account deletion is not yet implemented. Please contact support.');
   };
 
   const installPWA = () => {
-    toast.info('To install: Open browser menu → "Add to Home Screen"');
+    toast.info('To install: Open browser menu > "Add to Home Screen"');
   };
 
-  if (loading) {
-    return (
-      <div className="p-4 md:p-6">
-        <div className="text-center py-12 text-gray-500">Loading settings...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6">Settings</h1>
+    <div className="p-5 md:p-8 max-w-2xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Settings</h1>
+        <p className="text-sm text-[#8888a4] mt-0.5">Manage your account and preferences</p>
+      </motion.div>
 
-      {/* User Profile */}
-      <Card className="p-6 mb-4">
-        <div className="flex items-center gap-3 mb-4">
-          <User className="w-5 h-5 text-teal-600" />
-          <h2 className="text-xl font-semibold">User Profile</h2>
+      {/* Profile */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-4"
+      >
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00E5A0]/15 to-[#8B5CF6]/15 border border-white/[0.06] flex items-center justify-center">
+            <User className="w-5 h-5 text-[#00E5A0]" />
+          </div>
+          <div>
+            <h2 className="font-bold text-white">Profile</h2>
+            <p className="text-xs text-[#8888a4]">{profile?.email}</p>
+          </div>
         </div>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Email</label>
+            <input
               type="email"
               value={profile?.email || ''}
               disabled
-              className="h-12 text-base bg-gray-50"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[#4a4a66] cursor-not-allowed"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Name</label>
+            <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
             />
           </div>
-
-          <Button
+          <button
             onClick={saveProfile}
             disabled={saving}
-            className="w-full bg-teal-600 hover:bg-teal-700"
+            className="w-full h-11 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-semibold text-sm hover:shadow-[0_0_20px_rgba(0,229,160,0.2)] transition-all disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Profile'}
-          </Button>
+          </button>
         </div>
-      </Card>
+      </motion.div>
 
       {/* Company Info */}
-      <Card className="p-6 mb-4">
-        <div className="flex items-center gap-3 mb-4">
-          <Building2 className="w-5 h-5 text-teal-600" />
-          <h2 className="text-xl font-semibold">Company Info</h2>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-4"
+      >
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8B5CF6]/15 to-[#EC4899]/15 border border-white/[0.06] flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-[#8B5CF6]" />
+          </div>
+          <div>
+            <h2 className="font-bold text-white">Company Info</h2>
+            <p className="text-xs text-[#8888a4]">Used in export headers</p>
+          </div>
         </div>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="company">Company Name (optional)</Label>
-            <Input
-              id="company"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Company Name (optional)</label>
+            <input
               type="text"
               placeholder="Your company name"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
             />
-            <p className="text-sm text-gray-500">
-              Used in export headers
-            </p>
           </div>
-
-          <Button
+          <button
             onClick={saveCompanyInfo}
-            variant="outline"
-            className="w-full"
+            className="w-full h-11 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white font-medium text-sm hover:bg-white/[0.06] transition-all"
           >
             Save Company Info
-          </Button>
+          </button>
         </div>
-      </Card>
+      </motion.div>
 
-      {/* PWA Installation */}
-      <Card className="p-6 mb-4 bg-gradient-to-br from-teal-50 to-white">
+      {/* Install App */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="p-5 rounded-2xl bg-gradient-to-br from-[#00E5A0]/[0.07] to-[#8B5CF6]/[0.07] border border-white/[0.06] mb-4"
+      >
         <div className="flex items-center gap-3 mb-4">
-          <Smartphone className="w-5 h-5 text-teal-600" />
-          <h2 className="text-xl font-semibold">Install App</h2>
+          <div className="w-10 h-10 rounded-xl bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
+            <Smartphone className="w-5 h-5 text-[#00E5A0]" />
+          </div>
+          <div>
+            <h2 className="font-bold text-white">Install App</h2>
+            <p className="text-xs text-[#8888a4]">Native app experience</p>
+          </div>
         </div>
-
-        <p className="text-gray-600 mb-4">
-          Install Mileage Tracker on your home screen for a native app experience.
+        <p className="text-sm text-[#8888a4] mb-4">
+          Install Mileage Tracker on your home screen for quick access and offline capability.
         </p>
-
-        <Button
+        <button
           onClick={installPWA}
-          variant="outline"
-          className="w-full border-teal-600 text-teal-600 hover:bg-teal-50"
+          className="w-full h-11 rounded-xl border border-[#00E5A0]/20 bg-[#00E5A0]/10 text-[#00E5A0] font-semibold text-sm hover:bg-[#00E5A0]/15 transition-all flex items-center justify-center gap-2"
         >
-          <Download className="w-4 h-4 mr-2" />
+          <Download className="w-4 h-4" />
           Add to Home Screen
-        </Button>
-      </Card>
+        </button>
+      </motion.div>
 
       {/* Data Management */}
-      <Card className="p-6 mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-6"
+      >
         <div className="flex items-center gap-3 mb-4">
-          <Download className="w-5 h-5 text-teal-600" />
-          <h2 className="text-xl font-semibold">Data Management</h2>
+          <div className="w-10 h-10 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20 flex items-center justify-center">
+            <Download className="w-5 h-5 text-[#F59E0B]" />
+          </div>
+          <div>
+            <h2 className="font-bold text-white">Data Management</h2>
+            <p className="text-xs text-[#8888a4]">Export or manage your data</p>
+          </div>
         </div>
+        <button
+          onClick={exportAllData}
+          className="w-full h-11 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white font-medium text-sm hover:bg-white/[0.06] transition-all flex items-center justify-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Export All Data (JSON)
+        </button>
+      </motion.div>
 
-        <div className="space-y-3">
-          <Button
-            onClick={exportAllData}
-            variant="outline"
-            className="w-full"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export All Data
-          </Button>
-
-          <p className="text-sm text-gray-500">
-            Download all your trips, vehicles, and profile data as JSON.
-          </p>
-        </div>
-      </Card>
-
-      <Separator className="my-6" />
+      {/* Divider */}
+      <div className="border-t border-white/[0.06] my-6" />
 
       {/* Actions */}
-      <div className="space-y-3">
-        <Button
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="space-y-3"
+      >
+        <button
           onClick={handleLogout}
-          variant="outline"
-          className="w-full"
+          className="w-full h-12 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white font-medium flex items-center justify-center gap-2 hover:bg-white/[0.06] transition-all"
         >
-          <LogOut className="w-4 h-4 mr-2" />
+          <LogOut className="w-4 h-4" />
           Log Out
-        </Button>
+        </button>
 
-        <Button
+        <button
           onClick={deleteAccount}
-          variant="outline"
-          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+          className="w-full h-12 rounded-xl border border-[#ff4466]/15 bg-[#ff4466]/[0.05] text-[#ff4466] font-medium flex items-center justify-center gap-2 hover:bg-[#ff4466]/[0.08] transition-all"
         >
+          <Shield className="w-4 h-4" />
           Delete Account
-        </Button>
-      </div>
+        </button>
+      </motion.div>
 
-      <div className="mt-8 text-center text-sm text-gray-500">
+      <div className="mt-10 text-center text-xs text-[#4a4a66]">
         Mileage Tracker v1.0.0
       </div>
     </div>

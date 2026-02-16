@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowLeft, MapPin, Gauge, Trash2 } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
+import { ArrowLeft, Gauge, Trash2, Briefcase, User as UserIcon, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Card } from '../components/ui/card';
 import { apiRequest, supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { motion } from 'motion/react';
 
 interface Vehicle {
   id: string;
@@ -53,20 +49,14 @@ export default function EditTrip() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-
       const token = session.access_token;
 
       const [vehiclesResponse, tripsResponse] = await Promise.all([
-        apiRequest('/vehicles', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        apiRequest('/trips', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        apiRequest('/vehicles', { headers: { Authorization: `Bearer ${token}` } }),
+        apiRequest('/trips', { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       setVehicles(vehiclesResponse.vehicles || []);
-      
       const trip = tripsResponse.trips?.find((t: Trip) => t.id === id);
       if (trip) {
         setDate(trip.date);
@@ -100,22 +90,12 @@ export default function EditTrip() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     const start = parseFloat(odometerStart);
     const end = parseFloat(odometerEnd);
-    
-    if (isNaN(start) || isNaN(end)) {
-      toast.error('Enter a valid km value.');
-      return;
-    }
-    
-    if (end <= start) {
-      toast.error('Odometer end must be greater than odometer start.');
-      return;
-    }
+    if (isNaN(start) || isNaN(end)) { toast.error('Enter valid km values'); return; }
+    if (end <= start) { toast.error('End must be greater than start'); return; }
 
     setSaving(true);
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -124,19 +104,12 @@ export default function EditTrip() {
         method: 'PUT',
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          date,
-          time,
-          vehicle_id: vehicleId || undefined,
-          start_location: startLocation,
-          end_location: endLocation,
-          odometer_start: start,
-          odometer_end: end,
-          purpose,
-          notes,
+          date, time, vehicle_id: vehicleId || undefined,
+          start_location: startLocation, end_location: endLocation,
+          odometer_start: start, odometer_end: end, purpose, notes,
         }),
       });
-
-      toast.success('Trip updated.');
+      toast.success('Trip updated');
       navigate('/app/trips');
     } catch (error) {
       console.error('Update error:', error);
@@ -148,16 +121,13 @@ export default function EditTrip() {
 
   const handleDelete = async () => {
     if (!confirm('Delete this trip?')) return;
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-
       await apiRequest(`/trips/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
-
       toast.success('Trip deleted');
       navigate('/app/trips');
     } catch (error) {
@@ -168,8 +138,11 @@ export default function EditTrip() {
 
   if (loading) {
     return (
-      <div className="p-4 md:p-6">
-        <div className="text-center py-12 text-gray-500">Loading trip...</div>
+      <div className="p-5 md:p-8">
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-8 h-8 border-2 border-[#00E5A0]/30 border-t-[#00E5A0] rounded-full animate-spin" />
+          <span className="text-[#8888a4] text-sm">Loading trip...</span>
+        </div>
       </div>
     );
   }
@@ -177,69 +150,66 @@ export default function EditTrip() {
   const distance = calculateDistance();
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
+    <div className="p-5 md:p-8 max-w-2xl mx-auto">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3 mb-6"
+      >
+        <button
           onClick={() => navigate(-1)}
-          className="h-10 w-10"
+          className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#8888a4] hover:text-white hover:bg-white/[0.06] transition-all"
         >
           <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-2xl md:text-3xl font-bold flex-1">Edit Trip</h1>
-        <Button
-          variant="ghost"
-          size="icon"
+        </button>
+        <h1 className="text-2xl font-bold text-white tracking-tight flex-1">Edit Trip</h1>
+        <button
           onClick={handleDelete}
-          className="h-10 w-10 text-red-600 hover:text-red-700 hover:bg-red-50"
+          className="w-10 h-10 rounded-xl bg-[#ff4466]/10 border border-[#ff4466]/20 flex items-center justify-center text-[#ff4466] hover:bg-[#ff4466]/15 transition-all"
         >
           <Trash2 className="w-5 h-5" />
-        </Button>
-      </div>
+        </button>
+      </motion.div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Date & Time */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Date</label>
+            <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white focus:outline-none focus:border-[#00E5A0]/30 transition-all [color-scheme:dark]"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="time">Time</Label>
-            <Input
-              id="time"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Time</label>
+            <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white focus:outline-none focus:border-[#00E5A0]/30 transition-all [color-scheme:dark]"
             />
           </div>
         </div>
 
         {/* Vehicle */}
-        <div className="space-y-2">
-          <Label htmlFor="vehicle">Vehicle</Label>
+        <div className="space-y-1.5">
+          <label className="text-xs text-[#8888a4] font-medium">Vehicle</label>
           {vehicles.length === 0 ? (
-            <div className="text-sm text-gray-500">No vehicles available</div>
+            <p className="text-sm text-[#4a4a66]">No vehicles available</p>
           ) : (
             <Select value={vehicleId} onValueChange={setVehicleId}>
-              <SelectTrigger className="h-12 text-base">
-                <SelectValue placeholder="Select vehicle (optional)" />
+              <SelectTrigger className="h-12 rounded-xl bg-white/[0.04] border-white/[0.08] text-white">
+                <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
-              <SelectContent>
-                {vehicles.map(vehicle => (
-                  <SelectItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.name}
-                  </SelectItem>
+              <SelectContent className="bg-[#151524] border-white/[0.08] text-white">
+                {vehicles.map(v => (
+                  <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -247,131 +217,135 @@ export default function EditTrip() {
         </div>
 
         {/* Locations */}
-        <Card className="p-4 space-y-4 border-2 border-teal-100">
-          <Label className="text-base">Locations</Label>
-
-          <div className="space-y-2">
-            <Label htmlFor="start_location">Start Location</Label>
-            <Input
-              id="start_location"
-              placeholder="Enter start location"
+        <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-4">
+          <div className="flex items-center gap-2 text-[#00E5A0]">
+            <MapPin className="w-4 h-4" />
+            <span className="text-sm font-semibold text-white">Locations</span>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">Start</label>
+            <input
+              placeholder="Start location"
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="end_location">End Location</Label>
-            <Input
-              id="end_location"
-              placeholder="Enter end location"
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#8888a4] font-medium">End</label>
+            <input
+              placeholder="End location"
               value={endLocation}
               onChange={(e) => setEndLocation(e.target.value)}
               required
-              className="h-12 text-base"
+              className="w-full h-12 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
             />
           </div>
-        </Card>
+        </div>
 
         {/* Odometer */}
-        <Card className="p-4 space-y-4 border-2 border-teal-100">
-          <div className="flex items-center gap-2">
-            <Gauge className="w-5 h-5 text-teal-600" />
-            <Label className="text-base">Odometer</Label>
+        <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-4">
+          <div className="flex items-center gap-2 text-[#00E5A0]">
+            <Gauge className="w-4 h-4" />
+            <span className="text-sm font-semibold text-white">Odometer</span>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="odometer_start">Start (km)</Label>
-              <Input
-                id="odometer_start"
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8888a4] font-medium">Start (km)</label>
+              <input
                 type="number"
                 inputMode="numeric"
                 placeholder="0"
                 value={odometerStart}
                 onChange={(e) => setOdometerStart(e.target.value)}
                 required
-                className="h-14 text-lg font-bold text-center"
+                className="w-full h-14 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-xl font-bold text-center placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="odometer_end">End (km)</Label>
-              <Input
-                id="odometer_end"
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#8888a4] font-medium">End (km)</label>
+              <input
                 type="number"
                 inputMode="numeric"
                 placeholder="0"
                 value={odometerEnd}
                 onChange={(e) => setOdometerEnd(e.target.value)}
                 required
-                className="h-14 text-lg font-bold text-center"
+                className="w-full h-14 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-xl font-bold text-center placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all"
               />
             </div>
           </div>
-
-          <div className="bg-teal-50 p-4 rounded-lg text-center">
-            <div className="text-sm text-gray-600 mb-1">Distance</div>
-            <div className="text-3xl font-bold text-teal-600">
-              {distance.toFixed(1)} km
+          <div className="relative rounded-xl overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00E5A0]/10 to-[#8B5CF6]/10" />
+            <div className="relative p-4 text-center">
+              <div className="text-xs text-[#8888a4] mb-1 uppercase tracking-wider font-medium">Distance</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-[#00E5A0] to-[#06D6A0] bg-clip-text text-transparent">
+                {distance.toFixed(1)} km
+              </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Purpose */}
         <div className="space-y-2">
-          <Label>Purpose</Label>
+          <label className="text-xs text-[#8888a4] font-medium">Purpose</label>
           <div className="grid grid-cols-2 gap-3">
-            <Button
+            <button
               type="button"
-              variant={purpose === 'business' ? 'default' : 'outline'}
-              className={`h-12 ${purpose === 'business' ? 'bg-teal-600 hover:bg-teal-700' : ''}`}
               onClick={() => setPurpose('business')}
+              className={`h-12 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                purpose === 'business'
+                  ? 'bg-[#8B5CF6]/15 border-2 border-[#8B5CF6]/40 text-[#A78BFA]'
+                  : 'bg-white/[0.03] border border-white/[0.08] text-[#8888a4] hover:text-white hover:bg-white/[0.05]'
+              }`}
             >
+              <Briefcase className="w-4 h-4" />
               Business
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              variant={purpose === 'private' ? 'default' : 'outline'}
-              className={`h-12 ${purpose === 'private' ? 'bg-gray-600 hover:bg-gray-700' : ''}`}
               onClick={() => setPurpose('private')}
+              className={`h-12 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                purpose === 'private'
+                  ? 'bg-white/[0.08] border-2 border-white/[0.20] text-white'
+                  : 'bg-white/[0.03] border border-white/[0.08] text-[#8888a4] hover:text-white hover:bg-white/[0.05]'
+              }`}
             >
+              <UserIcon className="w-4 h-4" />
               Private
-            </Button>
+            </button>
           </div>
         </div>
 
         {/* Notes */}
-        <div className="space-y-2">
-          <Label htmlFor="notes">Notes (optional)</Label>
-          <Textarea
-            id="notes"
-            placeholder="Add any notes about this trip..."
+        <div className="space-y-1.5">
+          <label className="text-xs text-[#8888a4] font-medium">Notes (optional)</label>
+          <textarea
+            placeholder="Add any notes..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            className="text-base"
+            className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-[#4a4a66] focus:outline-none focus:border-[#00E5A0]/30 transition-all resize-none text-sm"
           />
         </div>
 
-        {/* Submit */}
+        {/* Actions */}
         <div className="grid grid-cols-2 gap-3">
-          <Button
+          <button
             type="button"
-            variant="outline"
             onClick={() => navigate(-1)}
-            className="h-12 text-base"
+            className="h-12 rounded-xl border border-white/[0.08] bg-white/[0.03] text-white font-medium hover:bg-white/[0.06] transition-all"
           >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             type="submit"
-            className="h-12 text-base bg-teal-600 hover:bg-teal-700"
+            className="h-12 rounded-xl bg-gradient-to-r from-[#00E5A0] to-[#00CC8E] text-[#07070e] font-semibold hover:shadow-[0_0_20px_rgba(0,229,160,0.25)] transition-all disabled:opacity-50"
             disabled={saving}
           >
-            {saving ? 'Saving...' : 'Save Trip'}
-          </Button>
+            {saving ? 'Saving...' : 'Update Trip'}
+          </button>
         </div>
       </form>
     </div>
