@@ -87,23 +87,35 @@ export default function Vehicles() {
 
       if (editingVehicle) {
         // Update
-        await apiRequest(`/vehicles/${editingVehicle.id}`, {
+        const response = await apiRequest(`/vehicles/${editingVehicle.id}`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify(vehicleData),
         });
+        
+        if (response.error) {
+          toast.error(response.error);
+          return;
+        }
+        
         toast.success('Vehicle updated');
       } else {
         // Create
-        await apiRequest('/vehicles', {
+        const response = await apiRequest('/vehicles', {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify(vehicleData),
         });
+        
+        if (response.error) {
+          toast.error(response.error);
+          return;
+        }
+        
         toast.success('Vehicle added');
       }
 
-      loadVehicles();
+      await loadVehicles();
       closeDialog();
     } catch (error) {
       console.error('Save error:', error);

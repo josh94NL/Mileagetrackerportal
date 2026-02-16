@@ -108,7 +108,7 @@ export default function Reports() {
   }
 
   // Prepare chart data
-  const chartData = Object.entries(data.monthly_data)
+  const chartData = Object.entries(data.monthly_data || {})
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-6) // Last 6 months
     .map(([month, values]) => ({
